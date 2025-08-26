@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<title>10手先じゃんけん</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  .hand-btn { transition: transform 0.2s; }
+  .hand-btn:hover { transform: scale(1.1); }
+  .fade-in { animation: fadeIn 0.6s ease-in-out; }
+  @keyframes fadeIn {
+    from { opacity: 0; transform: scale(0.8); }
+    to { opacity: 1; transform: scale(1); }
+  }
+  .winner { animation: pulseWin 0.8s ease-in-out; }
+  @keyframes pulseWin {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.2); }
+  }
+</style>
+</head>
+<body class="bg-gray-100 flex flex-col items-center min-h-screen p-4">
+
+<h1 class="text-3xl font-bold mb-4">10手先じゃんけん</h1>
+
+<div class="mb-4 flex gap-2">
+  <input id="room_id" class="border p-2 rounded flex-grow" placeholder="ルームIDを入力" />
+  <select id="player" class="border p-2 rounded">
+    <option value="A">プレイヤーA</option>
+    <option value="B">プレイヤーB</option>
+  </select>
+</div>
+
+<div id="hands-container" class="grid grid-cols-5 gap-2 mb-4"></div>
+
+<div class="flex gap-4 mb-4">
+  <button id="submitBtn" class="bg-blue-500 text-white px-4 py-2 rounded flex-grow">送信</button>
+  <button id="checkBtn" class="bg-green-500 text-white px-4 py-2 rounded flex-grow">結果確認</button>
+</div>
+
+<div id="result" class="mt-4 w-full max-w-xl"></div>
+
+<script>
+const API_URL = "https://script.google.com/macros/s/AKfycbzOXDG0yQk7JD-j7jHacTLrpMtOqR5fnq4YTtT5OYS_xYtGymGnERdsipyuCAsaYicfyA/exec";  // ←ここをGASのURLに書き換えてください
+const choices = ["グー", "チョキ", "パー"];
+const emojiMap = { "グー": "✊", "チョキ": "✌", "パー": "✋" };
+let hands = Array(10).fill("グー");
+
+const container = document.getElementById("hands-container");
+for (let i = 0; i < 10; i++) {
+  const div = document.createElement("div");
+  div.className = "bg-white p-2 rounded shadow flex flex-col items-center";
+  const select = document.createElement("select");
+  select.className = "border p-1 rounded hand-btn";
+  choices.forEach(c => {
+    const opt = document.createElement("option");
+    opt.value = c;
+    opt.textContent = c;
+    select.appendChild(opt);
+  });
+  select.value = "グー";
+  select.addEventListener("change", e => hands[i] = e.target.value);
+  div.appendChild(document.createTextNode((i + 1) + "手目"));
+  div.appendChild(select);
+  container.appendChild(div);
+}
+
+document.getElementById("submitBtn").addEventListener("click", async () => {
+  const roomId = document.getElementById("room_id").value.trim();
+  const player = document.getElementById("player").value;
+  if (!roomId) {
+    alert("ルームIDを入力してください");
+    return;
+  }
+  await fetch(API_URL, {
+    method: "POST",
+    body: JSON.stringify({
+      mode: "submit",
+      room_id: roomId,
+      player,
+      hands
+    })
+  });
+  alert("送信しました！");
+});
+
+document.getElementById("checkBtn").addEventListener("click", async () => {
+  const roomId = document.getElementById("room_id").value.trim();
+  if (!roomId) {
+    alert("ルームIDを入力してください");
+    return;
+  }
+  const res = await fetch(API_URL, {
+    method: "POST",
+    body: JSON.stringify({
+      mode: "check",
+      room_id: roomId
+    })
+  });
+  const data = await res.json();
+  const resultDiv = document.getElementById("result");
+  resultDiv.innerHTML = "";
+
+  if (data.status === "waiting") {
+    resultDiv.innerHTML = `<p class="text-center text-gray-600">相手の入力待ちです…</p>`;
+  } else {
+    data.results.forEach((round, i) => {
+      const row = document.createElement("div");
+      row.className = "flex items-center justify-between p-3 rounded mb-2 fade-in bg-white shadow";
+
+      const left = document.createElement("div");
+      left.className = `flex-1 text-center text-3xl ${round.winner === "A" ? "bg-green-300 winner" : (round.winner === "draw" ? "bg-gray-300" : "bg-red-300")} rounded p-2`;
+      left.textContent = emojiMap[round.aHand] || "❓";
+
+      const vs = document.createElement("div");
+      vs.className = "flex-none text-lg font-bold";
+      vs.textContent = "VS";
+
+      const right = document.createElement("div");
+      right.className = `flex-1 text-center text-3xl ${round.winner === "B" ? "bg-green-300 winner" : (round.winner === "draw" ? "bg-gray-300" : "bg-red-300")} rounded p-2`;
+      right.textContent = emojiMap[round.bHand] || "❓";
+
+      row.appendChild(left);
+      row.appendChild(vs);
+      row.appendChild(right);
+      resultDiv.appendChild(row);
+    });
+  }
+});
+</script>
+
+</body>
+</html>
